@@ -1,3 +1,5 @@
+// api.js
+
 // L'URL de base de votre backend Flask
 // Assurez-vous qu'elle correspond à l'endroit où votre serveur 'run.py' est exécuté.
 const API_URL = 'http://localhost:5000';
@@ -116,8 +118,79 @@ const apiClient = {
         throw new Error(errorData.msg || "Erreur réseau (DELETE)");
     }
     return response.json();
-  }
-  // Vous pouvez ajouter put, patch, etc. de la même manière
+  },
+
+  /**
+   * Exécute une requête PUT authentifiée.
+   * @param {string} endpoint - Le chemin de l'API.
+   * @param {object} body - L'objet JavaScript à envoyer en JSON.
+   */
+  put: async (endpoint, body) => {
+    const response = await fetch(`${API_URL}${endpoint}`, {
+      method: 'PUT', // CHANGEMENT DE METHODE
+      headers: {
+        'Authorization': `Bearer ${authService.getToken()}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.msg || "Erreur réseau (PUT)");
+    }
+    return response.json();
+  },
+
+
+  /**
+   * Exécute une requête GET et force le téléchargement du fichier.
+   */
+  download: async (endpoint, filename) => {
+    const response = await fetch(`${API_URL}${endpoint}`, {
+      headers: {
+        'Authorization': `Bearer ${authService.getToken()}` 
+      }
+    });
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.msg || "Erreur réseau (GET)");
+    }
+    
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+    
+    return { msg: "Téléchargement réussi" };
+  },
+};
+
+/**
+ * Service pour gérer les entités Ferme et Zone.
+ */
+export const managementService = {
+    // --- FARM ---
+    getFarms: () => {
+        return apiClient.get('/api/management/farms');
+    },
+    createFarm: (farmData) => {
+        return apiClient.post('/api/management/farms', farmData);
+    },
+    // --- ZONE ---
+    getZones: () => {
+        return apiClient.get('/api/management/zones');
+    },
+    getZonesByFarm: (farmIdStr) => {
+        return apiClient.get(`/api/management/farms/${farmIdStr}/zones`);
+    },
+    createZone: (zoneData) => {
+        return apiClient.post('/api/management/zones', zoneData);
+    }
 };
 
 /**
@@ -180,6 +253,12 @@ export const nodeService = {
     return apiClient.post('/api/nodes/', configData);
   },
 
+  // NOUVELLE FONCTION POUR LE TÉLÉCHARGEMENT
+  downloadNodeConfig: (nodeIdStr) => {
+    const filename = `${nodeIdStr}_config.json`;
+    return apiClient.download(`/api/nodes/${nodeIdStr}/config_json`, filename);
+  },
+
   /**
    * Supprime une configuration de nœud.
    *
@@ -187,7 +266,17 @@ export const nodeService = {
    */
   deleteNode: (nodeIdStr) => {
     return apiClient.delete(`/api/nodes/${nodeIdStr}`);
-  }
+  },
+/**
+   * [NOUVEAU] Met à jour une configuration de nœud existante (UPDATE).
+   *
+   * @param {string} nodeIdStr - L'ID string du nœud à modifier.
+   * @param {object} configData - Les données de configuration mises à jour.
+   */
+  updateNode: (nodeIdStr, configData) => {
+    // Utilise la méthode PUT sur l'endpoint spécifique /api/nodes/<node_id_str>
+    return apiClient.put(`/api/nodes/${nodeIdStr}`, configData);
+  },
 
   
 };
